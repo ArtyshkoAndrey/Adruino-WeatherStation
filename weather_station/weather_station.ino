@@ -11,9 +11,11 @@ DS1307 rtc(2, 3);
 long viewerMillis = 0;
 long getButtonClickMillis = 0;
 
-unsigned int hourse = 0;
-unsigned int minutes = 0;
-unsigned int seconds = 0;
+Time  t;
+
+String hour = "00";
+String min = "00";
+String sec = "00";
 
 // С какой переодичностью будет выводить новую информацию на экран без режима изменения времени
 long viewerInterval = 1000;
@@ -55,6 +57,7 @@ void ListenBooton() {
         break;
       case 31 ... 150:
         Serial.println("UP");
+        funUpButton();
         break;
       case 151 ... 360:
         Serial.println("DOWN");
@@ -131,7 +134,38 @@ void funLeftButton () {
 }
 
 void funUpButton () {
+  if (rewriteTimeMode) {
+    if (xPos == 0) {
+      char hChar = hour.charAt(0);
+      int h = hChar - '0';
+      h++;
+      if(h >= 3) {
+        h = 2;
+      }
 
+      hChar = h +'0';
+
+      hour.setCharAt(0, hChar);      
+    }
+
+    if (xPos == 1) {
+      char hChar = hour.charAt(1);
+      int h = hChar - '0';
+      h++;
+      if(h >= 10) {
+        h = 9;
+      }
+
+      hChar = h +'0';
+
+      hour.setCharAt(1, hChar);      
+    }
+  }
+
+  cursor(0, 0);
+  Serial.println(hour + ":" + min + ":" + sec);
+  lcd.print(hour + ":" + min + ":" + sec);
+  cursor(xPos, 0);
 }
 
 
@@ -146,8 +180,8 @@ void updateViewer() {
     viewerMillis = currentMillis;
     if (!rewriteTimeMode) {
       cursor(0, 0);
-      updateLocaleTime()
-      lcd.print(rtc.getTimeStr());
+      updateLocaleTime();
+      lcd.print(hour + ":" + min + ":" + sec);
       cursor(0, 1);
       lcd.print("                ");
     }
@@ -155,7 +189,26 @@ void updateViewer() {
 }
 
 void updateLocaleTime () {
-  hours = 
+  t = rtc.getTime();
+  int h = t.hour;
+  hour = h;
+  if (h < 10) {
+    hour = "0" + String(h);
+  }
+
+  int m = t.min;
+  min = m;
+  if (m < 10) {
+    min = "0" + String(m);
+  }
+
+  int s = t.sec;
+  sec = s;
+  if (s < 10) {
+    sec = "0" + String(s);
+  }
+
+  Serial.println(hour + ":" + min + ":" + sec);
 }
 
 void loop() {
