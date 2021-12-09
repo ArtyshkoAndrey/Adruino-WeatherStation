@@ -2,8 +2,8 @@
 #include <Wire.h>
 #include <DS1307.h>
 
-#define INTERVAL_IN_TIME_MODE 500
-#define INTERVAL_ISNT_TIME_MODE 300
+#define INTERVAL_IN_TIME_MODE 200
+#define INTERVAL_ISNT_TIME_MODE 500
 
 LiquidCrystal lcd(5, 4, 9, 8, 7, 6);
 DS1307 rtc(2, 3);
@@ -24,6 +24,9 @@ long buttonClickInterval = INTERVAL_IN_TIME_MODE;
 
 // Для режима что бы менять время
 bool rewriteTimeMode = false;
+
+// Если время изменили то записать, иначе оставить как есть
+bool editableTime = false;
 
 unsigned int xPos = 0;
 
@@ -61,6 +64,7 @@ void ListenBooton() {
         break;
       case 151 ... 360:
         Serial.println("DOWN");
+        funDownButton();
         break;
       case 361 ... 535:
         Serial.println("LEFT");
@@ -70,6 +74,16 @@ void ListenBooton() {
         Serial.println("SELECT");
         funSelectButton();
         break;
+    }
+
+    if ((data >= 31 && data <= 360) && rewriteTimeMode) {
+      
+      cursor(0, 0);
+      Serial.println(hour + ":" + min + ":" + sec);
+      lcd.print(hour + ":" + min + ":" + sec);
+      cursor(xPos, 0);
+
+      editableTime = true;
     }
   }
 }
@@ -96,6 +110,9 @@ void funSelectButton () {
     // Задержка системы что бы дважди не кликнуть за одно нажатие
     delay(500);
   } else if (rewriteTimeMode == false) {
+    if (editableTime) {
+      rtc.setTime(hour.toInt(), min.toInt(), sec.toInt());
+    }
     buttonClickInterval = INTERVAL_ISNT_TIME_MODE;
     lcd.noBlink();
     xPos = 0;
@@ -135,23 +152,45 @@ void funLeftButton () {
 
 void funUpButton () {
   if (rewriteTimeMode) {
+    // Если 1 позиция
     if (xPos == 0) {
-      char hChar = hour.charAt(0);
+      char hDecChar = hour.charAt(0);
+      int hD = hDecChar - '0';
+
+      char hChar = hour.charAt(1);
       int h = hChar - '0';
-      h++;
-      if(h >= 3) {
-        h = 2;
+
+      hD++;
+      // Ограничение до 2 десятков
+      if(hD >= 3) {
+        hD = 2;
       }
 
-      hChar = h +'0';
+      // Если сделали 20-ки часов то младшая ступень должна быть менее 5      
+      if (hD == 2 && h > 4) {
+        h = 4;
+        hChar = h + '0';
+        hour.setCharAt(1, hChar);
+      }
 
-      hour.setCharAt(0, hChar);      
+      hDecChar = hD +'0';
+
+      hour.setCharAt(0, hDecChar);      
     }
-
+    // Если 2 позиция
     if (xPos == 1) {
       char hChar = hour.charAt(1);
       int h = hChar - '0';
+
+      char hDecChar = hour.charAt(0);
+      int hD = hDecChar - '0';
+
       h++;
+
+      if (hD == 2 && h > 4) {
+        h = 4;
+      }
+
       if(h >= 10) {
         h = 9;
       }
@@ -160,12 +199,132 @@ void funUpButton () {
 
       hour.setCharAt(1, hChar);      
     }
-  }
 
-  cursor(0, 0);
-  Serial.println(hour + ":" + min + ":" + sec);
-  lcd.print(hour + ":" + min + ":" + sec);
-  cursor(xPos, 0);
+    if (xPos == 3) {
+      char mChar = min.charAt(0);
+      int m = mChar - '0';
+
+      if (m < 5) {
+        m++;
+      }
+
+      mChar = m + '0';
+
+      min.setCharAt(0, mChar);
+    }
+
+    if (xPos == 4) {
+      char mChar = min.charAt(1);
+      int m = mChar - '0';
+
+      if (m < 9) {
+        m++;
+      }
+
+      mChar = m + '0';
+
+      min.setCharAt(1, mChar);
+    }
+
+    if (xPos == 6) {
+      char sChar = sec.charAt(0);
+      int s = sChar - '0';
+
+      if (s < 5) {
+        s++;
+      }
+
+      sChar = s + '0';
+
+      sec.setCharAt(0, sChar);
+    }
+
+    if (xPos == 7) {
+      char sChar = sec.charAt(1);
+      int s = sChar - '0';
+
+      if (s < 9) {
+        s++;
+      }
+
+      sChar = s + '0';
+
+      sec.setCharAt(1, sChar);
+    }
+  }
+}
+
+void funDownButton () {
+  if (rewriteTimeMode) {
+    // Если 1 позиция
+    if (xPos == 0) {
+      char hDecChar = hour.charAt(0);
+      int hD = hDecChar - '0';
+
+      // Ограничение до 0 десятков
+      if(hD > 0) {
+        hD--;
+        hDecChar = hD +'0';
+        hour.setCharAt(0, hDecChar);  
+      }
+          
+    }
+    // Если 2 позиция
+    if (xPos == 1) {
+      char hChar = hour.charAt(1);
+      int h = hChar - '0';
+
+      if(h > 0) {
+        h--;
+        hChar = h +'0';
+        hour.setCharAt(1, hChar);
+      } 
+    }
+
+    if (xPos == 3) {
+      char mChar = min.charAt(0);
+      int m = mChar - '0';
+
+      if (m > 0) {
+        m--;
+        mChar = m + '0';
+        min.setCharAt(0, mChar);
+      }
+    }
+
+    if (xPos == 4) {
+      char mChar = min.charAt(1);
+      int m = mChar - '0';
+
+      if (m > 0) {
+        m--;
+        mChar = m + '0';
+        min.setCharAt(1, mChar);
+      }
+    }
+
+    if (xPos == 6) {
+      char sChar = sec.charAt(0);
+      int s = sChar - '0';
+
+      if (s >5) {
+        s--;
+        sChar = s + '0';
+        sec.setCharAt(0, sChar);
+      }
+    }
+
+    if (xPos == 7) {
+      char sChar = sec.charAt(1);
+      int s = sChar - '0';
+
+      if (s > 0) {
+        s--;
+        sChar = s + '0';
+        sec.setCharAt(1, sChar);
+      }
+    }
+  }
 }
 
 
@@ -212,6 +371,7 @@ void updateLocaleTime () {
 }
 
 void loop() {
+
   ListenBooton ();
 
   updateViewer();
