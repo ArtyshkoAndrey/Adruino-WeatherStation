@@ -28,12 +28,51 @@ bool rewriteTimeMode = false;
 // Если время изменили то записать, иначе оставить как есть
 bool editableTime = false;
 
+bool gamer = false;
+unsigned int counterGamer = 0;
+bool startGamer = false;
+
 unsigned int xPos = 0;
+
+//--------------------------//
+// Fore Game Data           //
+//--------------------------//
+
+int level = 1;       // переменная для отсчета уровня
+int pause = 400; // переменная для задержки
+byte p = 0;          // переменная для времени прыжка
+
+// создаем массивы дракончика, дерева, камня и птицы
+byte dracon[8] = {
+ 0b01110, 0b11011, 0b11111, 0b11100, 0b11111, 0b01100, 0b10010, 0b11011
+};
+byte derevo[8] = {
+ 0b00000, 0b00000, 0b00000, 0b11011, 0b11011, 0b11011, 0b01100, 0b01100
+};
+byte kamen[8] = {
+ 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b01110, 0b11111
+};
+byte ptica[8] = {
+ 0b00100, 0b00101, 0b01111, 0b11111, 0b10100, 0b00100, 0b00000, 0b00000
+};
+
+//--------------------------//
+// End Game Data            //
+//--------------------------//
 
 void setup() {
   Serial.begin(9600);
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
+
+  //GAME DATA
+  lcd.createChar(0, dracon);
+  lcd.createChar(1, derevo);
+  lcd.createChar(2, kamen);
+  lcd.createChar(3, ptica);  
+
+  //END GAME DATA
+  
   // Set the clock to run-mode
   rtc.halt(false);
 
@@ -64,7 +103,17 @@ void ListenBooton() {
         break;
       case 151 ... 360:
         Serial.println("DOWN");
-        funDownButton();
+        if (rewriteTimeMode == false && gamer == false) {
+          counterGamer++;
+          
+          if (counterGamer > 10) {
+            gamer = true;
+            startGamer = true;
+            counterGamer = 0;            
+          }
+        } else {
+          funDownButton();
+        }
         break;
       case 361 ... 535:
         Serial.println("LEFT");
@@ -72,7 +121,18 @@ void ListenBooton() {
         break;
       case 536 ... 760:
         Serial.println("SELECT");
-        funSelectButton();
+        if (rewriteTimeMode == false && gamer == true) {
+          counterGamer++;
+          
+          if (counterGamer > 10) {
+            gamer = false;
+            lcd.clear();
+            counterGamer = 0;            
+          }
+        } else {
+          funSelectButton();
+        }
+        
         break;
     }
 
@@ -337,7 +397,7 @@ void updateViewer() {
   if(currentMillis - viewerMillis > viewerInterval) {
 
     viewerMillis = currentMillis;
-    if (!rewriteTimeMode) {
+    if (!rewriteTimeMode && !gamer) {
       cursor(0, 0);
       updateLocaleTime();
       lcd.print(hour + ":" + min + ":" + sec);
@@ -375,6 +435,128 @@ void loop() {
   ListenBooton ();
 
   updateViewer();
+
+  Game();
+}
+
+void Game () {
+  if (startGamer) {
+    lcd.clear();
+    lcd.setCursor(7, 0);
+    lcd.print("GO!");
+    delay(1000);
+    tone(10, 600);
+    delay(100);
+    noTone(10);
+    lcd.clear();
+    startGamer = false;
+  }else if (gamer) {
+    
+    // первоначальное положение дракончика и препятствия
+    byte d = 1;
+    byte x = 15;
+    byte y = 1;
+    // выбираем препятствие, которое появится, рандомно
+    byte i = random (1, 4);
+    if (i == 3) y = 0;
+    else y = 1;
+
+    while (x > 0) {
+      // очищаем экран и выводим номер уровня
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print(level);
+
+      // считываем данные с кнопки и учитываем количество циклов в прыжке
+      // если дакончик находится в прыжке долго - возвращаем его вниз
+      int buttonData = analogRead(A1);
+      if (buttonData >= 31 && buttonData <= 150) d = 0;
+      else d = 1;
+      
+      if (p > 3) d = 1;
+
+      if (buttonData >= 536 && buttonData <= 760) {
+        x = -1;
+        gamer = false;
+        break;
+      }
+
+      // выводим дракончика в нужной строке
+      lcd.setCursor(4, d);
+      lcd.print(char(0));
+      // выводим препятствие
+      lcd.setCursor(x, y);
+      tone(10, 50);
+      lcd.print(char(i));
+      noTone(10);
+
+      // если дракончик наткнулся на препятствие выводим надпись GAME OVER!
+      if (x == 4 && y == d) {
+        delay(400);
+        tone(10, 50);
+        delay(100);
+        noTone(10);
+        delay(100);
+        tone(10, 20);
+        delay(300);
+        noTone(10);
+        lcd.clear();
+        delay(200);
+        lcd.setCursor(3, 0);
+        lcd.print("GAME OVER!");
+        delay(600);
+        lcd.clear();
+        delay(400);
+        lcd.setCursor(3, 0);
+        lcd.print("GAME OVER!");
+        delay(600);
+        lcd.clear();
+        lcd.setCursor(3, 1);
+        lcd.print("LEVEL: ");
+        lcd.print(level);
+        delay(400);
+        lcd.setCursor(3, 0);
+        lcd.print("GAME OVER!");
+        delay(3000);
+        lcd.clear();
+
+        // начинаем игру заново, обнулив уровень игры
+        lcd.setCursor(7, 0);
+        lcd.print("GO!");
+        delay(400);
+        tone(10, 600);
+        delay(100);
+        noTone(10);
+        lcd.clear();
+
+        level = 0;
+        pause = 400;
+        p = 0;
+        y = 1;
+        x = 0;
+        break;
+      }
+
+      // если дракончик прыгнул, издаем звук
+      if (d == 0) { tone(10, 200); delay(100); noTone(10); }
+      else { delay(100); }
+
+      // если дракончик не столкнулся, то меняем положение препятствия
+      // начинаем считать сколько циклов дракончик находится в прыжке
+      delay(pause);
+      x = x - 1;
+      p = p + 1;
+      if (p > 4) p = 0;
+    }
+
+    // переходим на следующий уровень и сокращаем время задержки
+    tone(10, 800);
+    delay(20);
+    level = level + 1;
+    pause = pause - 50;
+    if (pause < 0) pause = 0;
+
+  }
 }
 
 
