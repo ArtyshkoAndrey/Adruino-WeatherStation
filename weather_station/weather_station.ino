@@ -2,19 +2,28 @@
 #include <Wire.h>
 #include <DS1307.h>
 
+#define INTERVAL_IN_TIME_MODE 500
+#define INTERVAL_ISNT_TIME_MODE 300
+
 LiquidCrystal lcd(5, 4, 9, 8, 7, 6);
 DS1307 rtc(2, 3);
 
 long viewerMillis = 0;
 long getButtonClickMillis = 0;
 
+unsigned int hourse = 0;
+unsigned int minutes = 0;
+unsigned int seconds = 0;
+
 // С какой переодичностью будет выводить новую информацию на экран без режима изменения времени
 long viewerInterval = 1000;
 // С какой переодичностью будет слежить за кнопками
-long buttonClickInterval = 500;
+long buttonClickInterval = INTERVAL_IN_TIME_MODE;
 
 // Для режима что бы менять время
 bool rewriteTimeMode = false;
+
+unsigned int xPos = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -42,6 +51,7 @@ void ListenBooton() {
     switch(data) {
       case 0 ... 30:
         Serial.println("RIGHT");
+        funRightButton();
         break;
       case 31 ... 150:
         Serial.println("UP");
@@ -51,6 +61,7 @@ void ListenBooton() {
         break;
       case 361 ... 535:
         Serial.println("LEFT");
+        funLeftButton ();
         break;
       case 536 ... 760:
         Serial.println("SELECT");
@@ -72,18 +83,57 @@ void funSelectButton () {
 
   // Если выключили то убирает мигание и запускаем вывод всей информации  
   if (rewriteTimeMode == true) {
-    buttonClickInterval = 100;
+    buttonClickInterval = INTERVAL_IN_TIME_MODE;
+    xPos = 0;
     cursor(0, 0);
     lcd.print(rtc.getTimeStr());
+    cursor(xPos, 0);
     lcd.blink();
-    cursor(0, 0);
+
+    // Задержка системы что бы дважди не кликнуть за одно нажатие
     delay(500);
   } else if (rewriteTimeMode == false) {
-    buttonClickInterval = 500;
+    buttonClickInterval = INTERVAL_ISNT_TIME_MODE;
     lcd.noBlink();
-    cursor(0, 0);
+    xPos = 0;
+    cursor(xPos, 0);
   }
 }
+
+void funRightButton () {
+  if (rewriteTimeMode == true) {
+    if (xPos < 7) {
+    xPos++;
+    if (xPos == 2 || xPos == 5) {
+      xPos++;
+    }
+
+
+    cursor(xPos, 0);
+
+    }
+  }
+}
+
+void funLeftButton () {
+  if (rewriteTimeMode == true) {
+    if (xPos > 0) {
+    xPos--;
+    if (xPos == 2 || xPos == 5) {
+      xPos--;
+    }
+
+
+    cursor(xPos, 0);
+
+    }
+  }
+}
+
+void funUpButton () {
+
+}
+
 
 void cursor (int x, int y) {
   lcd.setCursor(x, y);
@@ -96,11 +146,16 @@ void updateViewer() {
     viewerMillis = currentMillis;
     if (!rewriteTimeMode) {
       cursor(0, 0);
+      updateLocaleTime()
       lcd.print(rtc.getTimeStr());
       cursor(0, 1);
       lcd.print("                ");
     }
   }
+}
+
+void updateLocaleTime () {
+  hours = 
 }
 
 void loop() {
