@@ -14,7 +14,7 @@ String PASS = "241298art"; // CHANGE ME
 int countTrueCommand;
 int countTimeCommand;
 bool found = false;
-
+bool wifiStatus = true;
 // В меню времени более часто опрашиваем кнопки
 #define INTERVAL_IN_TIME_MODE 200
 // Интервал опроса кнопок если не в меню времени
@@ -179,10 +179,12 @@ void sendCommand(String command, int maxTime, char readReplay[]) {
     Serial.println("OYI");
     countTrueCommand++;
     countTimeCommand = 0;
+    
   }
 
   if (found == false)
   {
+    wifiStatus = false;
     Serial.println("Fail");
     countTrueCommand = 0;
     countTimeCommand = 0;
@@ -530,7 +532,10 @@ void updateViewer() {
       if (screen == 1) {
         cursor(0, 0);
         updateLocaleTime();
-        lcd.print(hour + ":" + min + ":" + sec + "        ");
+        lcd.print(hour + ":" + min + ":" + sec + " ");
+        if (wifiStatus) {
+          lcd.print(" wifi+");
+        }
         cursor(0, 1);
         lcd.print(temp);
         lcd.print("*C ");
@@ -549,6 +554,11 @@ void updateViewer() {
         lcd.print("Min Temp: ");
         lcd.print(recordsTemp[0]);
         lcd.print("*C   ");
+      } else if (screen == 3) {
+        cursor(0, 0);
+        lcd.print("   WIFI-ERROR   ");
+        cursor(0, 1);
+        lcd.print("PLS CHECK MODULE");
       }
       
     }
@@ -585,6 +595,8 @@ void updateBMP180() {
   if(currentMillis - updateBMP180Millis > updateBMP180Interval) {
     if (screen == 1) {
       screen = 2;
+    } else if (screen = 2 && wifiStatus == false) {
+      screen = 3;
     } else {
       screen = 1;
     }
