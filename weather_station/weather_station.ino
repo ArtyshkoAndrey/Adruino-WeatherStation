@@ -1,26 +1,53 @@
 #include <LiquidCrystal.h>
 #include <Wire.h>
 #include <DS1307.h>
+#include <Adafruit_BMP085.h>
+#include <DHT.h>
+#include <EEPROM.h>
+#include <SoftwareSerial.h>
 
+#define RX 13
+#define TX 12
+
+String AP = "RT-GPON-ARTYSHKO";       // CHANGE ME
+String PASS = "241298art"; // CHANGE ME
+int countTrueCommand;
+int countTimeCommand;
+bool found = false;
+
+// В меню времени более часто опрашиваем кнопки
 #define INTERVAL_IN_TIME_MODE 200
+// Интервал опроса кнопок если не в меню времени
 #define INTERVAL_ISNT_TIME_MODE 500
+ // Тот самый номер пина датчика
+#define DHTPIN 10
+
+#define VERSION "1.3-b"
 
 LiquidCrystal lcd(5, 4, 9, 8, 7, 6);
 DS1307 rtc(2, 3);
+Adafruit_BMP085 bmp;
+DHT dht(DHTPIN, DHT11);
+SoftwareSerial esp8266(RX, TX);
 
-long viewerMillis = 0;
-long getButtonClickMillis = 0;
+long long viewerMillis = 0;
+long long getButtonClickMillis = 0;
+long long updateBMP180Millis = -5000;
 
+// Переменная в которой лежит обьект времени с часов
 Time  t;
 
+// Переменная для хранения Часа минут и секунд, что бы по позиции редактировтаь
 String hour = "00";
 String min = "00";
 String sec = "00";
 
 // С какой переодичностью будет выводить новую информацию на экран без режима изменения времени
-long viewerInterval = 1000;
+long long viewerInterval = 1000;
 // С какой переодичностью будет слежить за кнопками
-long buttonClickInterval = INTERVAL_IN_TIME_MODE;
+long long buttonClickInterval = INTERVAL_IN_TIME_MODE;
+
+long long updateBMP180Interval = 5000;
 
 // Для режима что бы менять время
 bool rewriteTimeMode = false;
@@ -28,18 +55,31 @@ bool rewriteTimeMode = false;
 // Если время изменили то записать, иначе оставить как есть
 bool editableTime = false;
 
-bool gamer = false;
-unsigned int counterGamer = 0;
-bool startGamer = false;
+// Какой экран показывать
+int screen = 2;
 
+// Позиция курсора когда редачим время
 unsigned int xPos = 0;
+
+unsigned int mmg = 0;
+unsigned int temp = 0;
+unsigned int hum = 0;
+
+unsigned int recordsTemp[2];
+// 0 - minTemp
+// 1 - maxTemp
+String rescordsDates[2];
+// 0 - date MaxTemp
+// 1 - date MinTemp
 
 //--------------------------//
 // Fore Game Data           //
 //--------------------------//
-
+bool gamer = false;
+unsigned int counterGamer = 0;
+bool startGamer = false;
 int level = 1;       // переменная для отсчета уровня
-int pause = 400; // переменная для задержки
+int pause = 400;     // переменная для задержки
 byte p = 0;          // переменная для времени прыжка
 
 // создаем массивы дракончика, дерева, камня и птицы
@@ -61,9 +101,17 @@ byte ptica[8] = {
 //--------------------------//
 
 void setup() {
+
   Serial.begin(9600);
+  esp8266.begin(9600);
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
+  cursor(0, 0);
+  lcd.print("WIFI Initial");
+  cursor(0, 1);
+  lcd.print("PLS WAIT");
+
+  conectWifi();
 
   //GAME DATA
   lcd.createChar(0, dracon);
@@ -76,15 +124,84 @@ void setup() {
   // Set the clock to run-mode
   rtc.halt(false);
 
-  // Setup Serial connection
-  Serial.begin(9600);
   // Print a message to the LCD.
+  lcd.clear();
   cursor(0, 0);
-  lcd.print("Hello");
+  lcd.print("Meteostation");
   cursor(0, 1);
-  lcd.print("Version 1.0");
+  lcd.print("Version ");
+  lcd.print(VERSION);
+
+  if (!bmp.begin()) {
+    lcd.clear();
+    lcd.print('BMP180 - ERROR');
+    Serial.println("Could not find a valid BMP085 sensor, check wiring!");
+    while (1) {
+    }
+  }
+
+  dht.begin();
+
+  // clearRecords
+  // saveRecords(0, 0);
+
+  getRecords();
+  Serial.println(recordsTemp[1]);
+
+  delay(2000);
 }
 
+void conectWifi() {
+  sendCommand("AT", 5, "OK");
+  sendCommand("AT+CWMODE=1", 5, "OK");
+  sendCommand("AT+CWJAP=\"" + AP + "\",\"" + PASS + "\"", 20, "OK");
+}
+
+void sendCommand(String command, int maxTime, char readReplay[]) {
+  Serial.print(countTrueCommand);
+  Serial.print(". at command => ");
+  Serial.print(command);
+  Serial.print(" ");
+  while (countTimeCommand < (maxTime * 1))
+  {
+    esp8266.println(command);//at+cipsend
+    if (esp8266.find(readReplay)) //ok
+    {
+      found = true;
+      break;
+    }
+
+    countTimeCommand++;
+  }
+
+  if (found == true)
+  {
+    Serial.println("OYI");
+    countTrueCommand++;
+    countTimeCommand = 0;
+  }
+
+  if (found == false)
+  {
+    Serial.println("Fail");
+    countTrueCommand = 0;
+    countTimeCommand = 0;
+  }
+
+  found = false;
+}
+
+void getRecords() {
+  recordsTemp[0] = EEPROM.read(0);
+  recordsTemp[1] = EEPROM.read(3);
+}
+
+void saveRecords(int min, int max) {
+  EEPROM.write(0, min);
+  EEPROM.write(3, max);
+}
+
+// Нажатие на кнопку Слушаем на какие кнопки нажимаем
 void ListenBooton() {
   unsigned long currentMillis = millis();
   if(currentMillis - getButtonClickMillis > buttonClickInterval) {
@@ -141,6 +258,8 @@ void ListenBooton() {
       cursor(0, 0);
       Serial.println(hour + ":" + min + ":" + sec);
       lcd.print(hour + ":" + min + ":" + sec);
+      cursor(0, 1);
+      lcd.print("                ");
       cursor(xPos, 0);
 
       editableTime = true;
@@ -148,6 +267,7 @@ void ListenBooton() {
   }
 }
 
+// Нажатие на кнопку Селект
 void funSelectButton () {
   rewriteTimeMode = !rewriteTimeMode;
 
@@ -163,7 +283,10 @@ void funSelectButton () {
     buttonClickInterval = INTERVAL_IN_TIME_MODE;
     xPos = 0;
     cursor(0, 0);
-    lcd.print(rtc.getTimeStr());
+    Serial.println(hour + ":" + min + ":" + sec);
+    lcd.print(hour + ":" + min + ":" + sec);
+    cursor(0, 1);
+    lcd.print("                ");
     cursor(xPos, 0);
     lcd.blink();
 
@@ -180,6 +303,7 @@ void funSelectButton () {
   }
 }
 
+// Нажатие на кнопку Вправо
 void funRightButton () {
   if (rewriteTimeMode == true) {
     if (xPos < 7) {
@@ -195,6 +319,7 @@ void funRightButton () {
   }
 }
 
+// Нажатие на кнопку Влево
 void funLeftButton () {
   if (rewriteTimeMode == true) {
     if (xPos > 0) {
@@ -210,6 +335,7 @@ void funLeftButton () {
   }
 }
 
+// Нажатие на кнопку Вверх
 void funUpButton () {
   if (rewriteTimeMode) {
     // Если 1 позиция
@@ -314,6 +440,7 @@ void funUpButton () {
   }
 }
 
+// Нажатие на кнопку Вниз
 void funDownButton () {
   if (rewriteTimeMode) {
     // Если 1 позиция
@@ -387,26 +514,48 @@ void funDownButton () {
   }
 }
 
-
+// Сдвиг курсота на осям
 void cursor (int x, int y) {
   lcd.setCursor(x, y);
 }
 
+// Вывод информации на экран
 void updateViewer() {
   unsigned long currentMillis = millis();
   if(currentMillis - viewerMillis > viewerInterval) {
 
     viewerMillis = currentMillis;
     if (!rewriteTimeMode && !gamer) {
-      cursor(0, 0);
-      updateLocaleTime();
-      lcd.print(hour + ":" + min + ":" + sec);
-      cursor(0, 1);
-      lcd.print("                ");
+
+      if (screen == 1) {
+        cursor(0, 0);
+        updateLocaleTime();
+        lcd.print(hour + ":" + min + ":" + sec + "        ");
+        cursor(0, 1);
+        lcd.print(temp);
+        lcd.print("*C ");
+
+        lcd.print(hum);
+        lcd.print("%  ");
+
+        lcd.print(mmg);
+        lcd.print("Mmg");
+      } else if(screen == 2) {
+        cursor(0, 0);
+        lcd.print("Max Temp: ");
+        lcd.print(recordsTemp[1]);
+        lcd.print("*C  ");
+        cursor(0, 1);
+        lcd.print("Min Temp: ");
+        lcd.print(recordsTemp[0]);
+        lcd.print("*C   ");
+      }
+      
     }
   }
 }
 
+// Взятие данных о времени с датчика
 void updateLocaleTime () {
   t = rtc.getTime();
   int h = t.hour;
@@ -430,9 +579,45 @@ void updateLocaleTime () {
   Serial.println(hour + ":" + min + ":" + sec);
 }
 
+// Обновление температуры и давления
+void updateBMP180() {
+  unsigned long currentMillis = millis();
+  if(currentMillis - updateBMP180Millis > updateBMP180Interval) {
+    if (screen == 1) {
+      screen = 2;
+    } else {
+      screen = 1;
+    }
+    updateBMP180Millis = currentMillis;
+    bool flagUpdateEeprom = false;
+    temp = bmp.readTemperature();
+
+    float pa = bmp.readPressure();
+    pa = pa * 0.007500637554192;
+    mmg = pa;
+
+    hum = dht.readHumidity();
+
+    if (temp < recordsTemp[0] || recordsTemp[0] == 0) {
+      flagUpdateEeprom = true;
+      recordsTemp[0] = temp;      
+    }
+
+    if (temp > recordsTemp[1]) {
+      flagUpdateEeprom = true;
+      recordsTemp[1] = temp;
+    }
+
+    if (flagUpdateEeprom) {
+      saveRecords(recordsTemp[0], recordsTemp[1]);
+    }
+  }
+}
+
 void loop() {
 
   ListenBooton ();
+  updateBMP180();
 
   updateViewer();
 
@@ -560,3 +745,4 @@ void Game () {
 }
 
 
+   
