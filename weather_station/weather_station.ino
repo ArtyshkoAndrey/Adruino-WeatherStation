@@ -4,17 +4,12 @@
 #include <Adafruit_BMP085.h>
 #include <DHT.h>
 #include <EEPROM.h>
-#include <SoftwareSerial.h>
 
 #define RX 13
 #define TX 12
 
 String AP = "RT-GPON-ARTYSHKO";       // CHANGE ME
 String PASS = "241298art"; // CHANGE ME
-int countTrueCommand;
-int countTimeCommand;
-bool found = false;
-bool wifiStatus = true;
 // В меню времени более часто опрашиваем кнопки
 #define INTERVAL_IN_TIME_MODE 200
 // Интервал опроса кнопок если не в меню времени
@@ -28,7 +23,6 @@ LiquidCrystal lcd(5, 4, 9, 8, 7, 6);
 DS1307 rtc(2, 3);
 Adafruit_BMP085 bmp;
 DHT dht(DHTPIN, DHT11);
-SoftwareSerial esp8266(RX, TX);
 
 long long viewerMillis = 0;
 long long getButtonClickMillis = 0;
@@ -103,15 +97,12 @@ byte ptica[8] = {
 void setup() {
 
   Serial.begin(9600);
-  esp8266.begin(9600);
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
   cursor(0, 0);
   lcd.print("WIFI Initial");
   cursor(0, 1);
   lcd.print("PLS WAIT");
-
-  conectWifi();
 
   //GAME DATA
   lcd.createChar(0, dracon);
@@ -149,48 +140,6 @@ void setup() {
   Serial.println(recordsTemp[1]);
 
   delay(2000);
-}
-
-void conectWifi() {
-  sendCommand("AT", 5, "OK");
-  sendCommand("AT+CWMODE=1", 5, "OK");
-  sendCommand("AT+CWJAP=\"" + AP + "\",\"" + PASS + "\"", 20, "OK");
-}
-
-void sendCommand(String command, int maxTime, char readReplay[]) {
-  Serial.print(countTrueCommand);
-  Serial.print(". at command => ");
-  Serial.print(command);
-  Serial.print(" ");
-  while (countTimeCommand < (maxTime * 1))
-  {
-    esp8266.println(command);//at+cipsend
-    if (esp8266.find(readReplay)) //ok
-    {
-      found = true;
-      break;
-    }
-
-    countTimeCommand++;
-  }
-
-  if (found == true)
-  {
-    Serial.println("OYI");
-    countTrueCommand++;
-    countTimeCommand = 0;
-    
-  }
-
-  if (found == false)
-  {
-    wifiStatus = false;
-    Serial.println("Fail");
-    countTrueCommand = 0;
-    countTimeCommand = 0;
-  }
-
-  found = false;
 }
 
 void getRecords() {
@@ -533,9 +482,6 @@ void updateViewer() {
         cursor(0, 0);
         updateLocaleTime();
         lcd.print(hour + ":" + min + ":" + sec + " ");
-        if (wifiStatus) {
-          lcd.print(" wifi+");
-        }
         cursor(0, 1);
         lcd.print(temp);
         lcd.print("*C ");
@@ -554,11 +500,6 @@ void updateViewer() {
         lcd.print("Min Temp: ");
         lcd.print(recordsTemp[0]);
         lcd.print("*C   ");
-      } else if (screen == 3) {
-        cursor(0, 0);
-        lcd.print("   WIFI-ERROR   ");
-        cursor(0, 1);
-        lcd.print("PLS CHECK MODULE");
       }
       
     }
@@ -595,11 +536,10 @@ void updateBMP180() {
   if(currentMillis - updateBMP180Millis > updateBMP180Interval) {
     if (screen == 1) {
       screen = 2;
-    } else if (screen = 2 && wifiStatus == false) {
-      screen = 3;
     } else {
-      screen = 1;
+      screen = 2;
     }
+
     updateBMP180Millis = currentMillis;
     bool flagUpdateEeprom = false;
     temp = bmp.readTemperature();
@@ -755,6 +695,3 @@ void Game () {
 
   }
 }
-
-
-   
