@@ -1,0 +1,5 @@
+"/Users/andrey/Library/Application Support/JetBrains/Toolbox/apps/CLion/ch-0/213.5744.254/CLion.app/Contents/bin/cmake/mac/bin/cmake" -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_MAKE_PROGRAM=/Users/andrey/Library/Application Support/JetBrains/Toolbox/apps/CLion/ch-0/213.5744.254/CLion.app/Contents/bin/ninja/mac/ninja" -G Ninja /Users/andrey/Desktop/Adruino-WeatherStation/weather_station
+-- Configuring done
+CMake Error: CMake can not determine linker language for target: weather_station
+-- Generating done
+CMake Generate step failed.  Build files cannot be regenerated correctly.

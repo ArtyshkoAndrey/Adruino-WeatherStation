@@ -5,19 +5,14 @@
 #include <DHT.h>
 #include <EEPROM.h>
 
-#define RX 13
-#define TX 12
-
-String AP = "RT-GPON-ARTYSHKO";       // CHANGE ME
-String PASS = "241298art"; // CHANGE ME
 // В меню времени более часто опрашиваем кнопки
 #define INTERVAL_IN_TIME_MODE 200
 // Интервал опроса кнопок если не в меню времени
 #define INTERVAL_ISNT_TIME_MODE 500
- // Тот самый номер пина датчика
+// Тот самый номер пина датчика
 #define DHTPIN 10
 
-#define VERSION "1.3-b"
+#define VERSION "1.4"
 
 LiquidCrystal lcd(5, 4, 9, 8, 7, 6);
 DS1307 rtc(2, 3);
@@ -29,7 +24,7 @@ long long getButtonClickMillis = 0;
 long long updateBMP180Millis = -5000;
 
 // Переменная в которой лежит обьект времени с часов
-Time  t;
+Time t;
 
 // Переменная для хранения Часа минут и секунд, что бы по позиции редактировтаь
 String hour = "00";
@@ -72,22 +67,22 @@ String rescordsDates[2];
 bool gamer = false;
 unsigned int counterGamer = 0;
 bool startGamer = false;
-int level = 1;       // переменная для отсчета уровня
-int pause = 400;     // переменная для задержки
-byte p = 0;          // переменная для времени прыжка
+int level = 1;    // переменная для отсчета уровня
+int pause = 400;  // переменная для задержки
+byte p = 0;       // переменная для времени прыжка
 
 // создаем массивы дракончика, дерева, камня и птицы
 byte dracon[8] = {
- 0b01110, 0b11011, 0b11111, 0b11100, 0b11111, 0b01100, 0b10010, 0b11011
+  0b01110, 0b11011, 0b11111, 0b11100, 0b11111, 0b01100, 0b10010, 0b11011
 };
 byte derevo[8] = {
- 0b00000, 0b00000, 0b00000, 0b11011, 0b11011, 0b11011, 0b01100, 0b01100
+  0b00000, 0b00000, 0b00000, 0b11011, 0b11011, 0b11011, 0b01100, 0b01100
 };
 byte kamen[8] = {
- 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b01110, 0b11111
+  0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b01110, 0b11111
 };
 byte ptica[8] = {
- 0b00100, 0b00101, 0b01111, 0b11111, 0b10100, 0b00100, 0b00000, 0b00000
+  0b00100, 0b00101, 0b01111, 0b11111, 0b10100, 0b00100, 0b00000, 0b00000
 };
 
 //--------------------------//
@@ -99,19 +94,15 @@ void setup() {
   Serial.begin(9600);
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
-  cursor(0, 0);
-  lcd.print("WIFI Initial");
-  cursor(0, 1);
-  lcd.print("PLS WAIT");
 
   //GAME DATA
   lcd.createChar(0, dracon);
   lcd.createChar(1, derevo);
   lcd.createChar(2, kamen);
-  lcd.createChar(3, ptica);  
+  lcd.createChar(3, ptica);
 
   //END GAME DATA
-  
+
   // Set the clock to run-mode
   rtc.halt(false);
 
@@ -125,7 +116,7 @@ void setup() {
 
   if (!bmp.begin()) {
     lcd.clear();
-    lcd.print('BMP180 - ERROR');
+    lcd.print("BMP180 - ERROR");
     Serial.println("Could not find a valid BMP085 sensor, check wiring!");
     while (1) {
     }
@@ -134,12 +125,11 @@ void setup() {
   dht.begin();
 
   // clearRecords
-  // saveRecords(0, 0);
+//   saveRecords(0, 0);
 
   getRecords();
-  Serial.println(recordsTemp[1]);
 
-  delay(2000);
+  delay(1000);
 }
 
 void getRecords() {
@@ -155,12 +145,12 @@ void saveRecords(int min, int max) {
 // Нажатие на кнопку Слушаем на какие кнопки нажимаем
 void ListenBooton() {
   unsigned long currentMillis = millis();
-  if(currentMillis - getButtonClickMillis > buttonClickInterval) {
+  if (currentMillis - getButtonClickMillis > buttonClickInterval) {
 
     getButtonClickMillis = currentMillis;
     int data = analogRead(A1);
 
-    switch(data) {
+    switch (data) {
       case 0 ... 30:
         Serial.println("RIGHT");
         funRightButton();
@@ -173,11 +163,11 @@ void ListenBooton() {
         Serial.println("DOWN");
         if (rewriteTimeMode == false && gamer == false) {
           counterGamer++;
-          
+
           if (counterGamer > 10) {
             gamer = true;
             startGamer = true;
-            counterGamer = 0;            
+            counterGamer = 0;
           }
         } else {
           funDownButton();
@@ -185,27 +175,27 @@ void ListenBooton() {
         break;
       case 361 ... 535:
         Serial.println("LEFT");
-        funLeftButton ();
+        funLeftButton();
         break;
       case 536 ... 760:
         Serial.println("SELECT");
         if (rewriteTimeMode == false && gamer == true) {
           counterGamer++;
-          
+
           if (counterGamer > 10) {
             gamer = false;
             lcd.clear();
-            counterGamer = 0;            
+            counterGamer = 0;
           }
         } else {
           funSelectButton();
         }
-        
+
         break;
     }
 
     if ((data >= 31 && data <= 360) && rewriteTimeMode) {
-      
+
       cursor(0, 0);
       Serial.println(hour + ":" + min + ":" + sec);
       lcd.print(hour + ":" + min + ":" + sec);
@@ -219,17 +209,17 @@ void ListenBooton() {
 }
 
 // Нажатие на кнопку Селект
-void funSelectButton () {
+void funSelectButton() {
   rewriteTimeMode = !rewriteTimeMode;
 
   Serial.print("Change rewriteTimeMode: ");
   Serial.println(rewriteTimeMode);
-  
+
   // Если включили режим изменения времени, то выводит один раз время
-  // Останавливаем вывод в лупе  
+  // Останавливаем вывод в лупе
   // Запускаем мигающий курсор
 
-  // Если выключили то убирает мигание и запускаем вывод всей информации  
+  // Если выключили то убирает мигание и запускаем вывод всей информации
   if (rewriteTimeMode == true) {
     buttonClickInterval = INTERVAL_IN_TIME_MODE;
     xPos = 0;
@@ -255,39 +245,37 @@ void funSelectButton () {
 }
 
 // Нажатие на кнопку Вправо
-void funRightButton () {
+void funRightButton() {
   if (rewriteTimeMode == true) {
     if (xPos < 7) {
-    xPos++;
-    if (xPos == 2 || xPos == 5) {
       xPos++;
-    }
+      if (xPos == 2 || xPos == 5) {
+        xPos++;
+      }
 
 
-    cursor(xPos, 0);
-
+      cursor(xPos, 0);
     }
   }
 }
 
 // Нажатие на кнопку Влево
-void funLeftButton () {
+void funLeftButton() {
   if (rewriteTimeMode == true) {
     if (xPos > 0) {
-    xPos--;
-    if (xPos == 2 || xPos == 5) {
       xPos--;
-    }
+      if (xPos == 2 || xPos == 5) {
+        xPos--;
+      }
 
 
-    cursor(xPos, 0);
-
+      cursor(xPos, 0);
     }
   }
 }
 
 // Нажатие на кнопку Вверх
-void funUpButton () {
+void funUpButton() {
   if (rewriteTimeMode) {
     // Если 1 позиция
     if (xPos == 0) {
@@ -299,20 +287,20 @@ void funUpButton () {
 
       hD++;
       // Ограничение до 2 десятков
-      if(hD >= 3) {
+      if (hD >= 3) {
         hD = 2;
       }
 
-      // Если сделали 20-ки часов то младшая ступень должна быть менее 5      
+      // Если сделали 20-ки часов то младшая ступень должна быть менее 5
       if (hD == 2 && h > 4) {
         h = 4;
         hChar = h + '0';
         hour.setCharAt(1, hChar);
       }
 
-      hDecChar = hD +'0';
+      hDecChar = hD + '0';
 
-      hour.setCharAt(0, hDecChar);      
+      hour.setCharAt(0, hDecChar);
     }
     // Если 2 позиция
     if (xPos == 1) {
@@ -328,13 +316,13 @@ void funUpButton () {
         h = 4;
       }
 
-      if(h >= 10) {
+      if (h >= 10) {
         h = 9;
       }
 
-      hChar = h +'0';
+      hChar = h + '0';
 
-      hour.setCharAt(1, hChar);      
+      hour.setCharAt(1, hChar);
     }
 
     if (xPos == 3) {
@@ -392,7 +380,7 @@ void funUpButton () {
 }
 
 // Нажатие на кнопку Вниз
-void funDownButton () {
+void funDownButton() {
   if (rewriteTimeMode) {
     // Если 1 позиция
     if (xPos == 0) {
@@ -400,23 +388,22 @@ void funDownButton () {
       int hD = hDecChar - '0';
 
       // Ограничение до 0 десятков
-      if(hD > 0) {
+      if (hD > 0) {
         hD--;
-        hDecChar = hD +'0';
-        hour.setCharAt(0, hDecChar);  
+        hDecChar = hD + '0';
+        hour.setCharAt(0, hDecChar);
       }
-          
     }
     // Если 2 позиция
     if (xPos == 1) {
       char hChar = hour.charAt(1);
       int h = hChar - '0';
 
-      if(h > 0) {
+      if (h > 0) {
         h--;
-        hChar = h +'0';
+        hChar = h + '0';
         hour.setCharAt(1, hChar);
-      } 
+      }
     }
 
     if (xPos == 3) {
@@ -445,7 +432,7 @@ void funDownButton () {
       char sChar = sec.charAt(0);
       int s = sChar - '0';
 
-      if (s >5) {
+      if (s > 5) {
         s--;
         sChar = s + '0';
         sec.setCharAt(0, sChar);
@@ -466,14 +453,14 @@ void funDownButton () {
 }
 
 // Сдвиг курсота на осям
-void cursor (int x, int y) {
+void cursor(int x, int y) {
   lcd.setCursor(x, y);
 }
 
 // Вывод информации на экран
 void updateViewer() {
   unsigned long currentMillis = millis();
-  if(currentMillis - viewerMillis > viewerInterval) {
+  if (currentMillis - viewerMillis > viewerInterval) {
 
     viewerMillis = currentMillis;
     if (!rewriteTimeMode && !gamer) {
@@ -481,7 +468,7 @@ void updateViewer() {
       if (screen == 1) {
         cursor(0, 0);
         updateLocaleTime();
-        lcd.print(hour + ":" + min + ":" + sec + " ");
+        lcd.print(hour + ":" + min + ":" + sec + "        ");
         cursor(0, 1);
         lcd.print(temp);
         lcd.print("*C ");
@@ -491,7 +478,7 @@ void updateViewer() {
 
         lcd.print(mmg);
         lcd.print("Mmg");
-      } else if(screen == 2) {
+      } else if (screen == 2) {
         cursor(0, 0);
         lcd.print("Max Temp: ");
         lcd.print(recordsTemp[1]);
@@ -501,13 +488,12 @@ void updateViewer() {
         lcd.print(recordsTemp[0]);
         lcd.print("*C   ");
       }
-      
     }
   }
 }
 
 // Взятие данных о времени с датчика
-void updateLocaleTime () {
+void updateLocaleTime() {
   t = rtc.getTime();
   int h = t.hour;
   hour = h;
@@ -533,11 +519,11 @@ void updateLocaleTime () {
 // Обновление температуры и давления
 void updateBMP180() {
   unsigned long currentMillis = millis();
-  if(currentMillis - updateBMP180Millis > updateBMP180Interval) {
+  if (currentMillis - updateBMP180Millis > updateBMP180Interval) {
     if (screen == 1) {
       screen = 2;
     } else {
-      screen = 2;
+      screen = 1;
     }
 
     updateBMP180Millis = currentMillis;
@@ -552,7 +538,7 @@ void updateBMP180() {
 
     if (temp < recordsTemp[0] || recordsTemp[0] == 0) {
       flagUpdateEeprom = true;
-      recordsTemp[0] = temp;      
+      recordsTemp[0] = temp;
     }
 
     if (temp > recordsTemp[1]) {
@@ -568,15 +554,15 @@ void updateBMP180() {
 
 void loop() {
 
-  ListenBooton ();
+  ListenBooton();
   updateBMP180();
 
   updateViewer();
 
-  Game();
+//  Game();
 }
 
-void Game () {
+void Game() {
   if (startGamer) {
     lcd.clear();
     lcd.setCursor(7, 0);
@@ -587,16 +573,17 @@ void Game () {
     noTone(10);
     lcd.clear();
     startGamer = false;
-  }else if (gamer) {
-    
+  } else if (gamer) {
+
     // первоначальное положение дракончика и препятствия
     byte d = 1;
     byte x = 15;
     byte y = 1;
     // выбираем препятствие, которое появится, рандомно
-    byte i = random (1, 4);
+    byte i = random(1, 4);
     if (i == 3) y = 0;
-    else y = 1;
+    else
+      y = 1;
 
     while (x > 0) {
       // очищаем экран и выводим номер уровня
@@ -608,8 +595,9 @@ void Game () {
       // если дакончик находится в прыжке долго - возвращаем его вниз
       int buttonData = analogRead(A1);
       if (buttonData >= 31 && buttonData <= 150) d = 0;
-      else d = 1;
-      
+      else
+        d = 1;
+
       if (p > 3) d = 1;
 
       if (buttonData >= 536 && buttonData <= 760) {
@@ -675,8 +663,13 @@ void Game () {
       }
 
       // если дракончик прыгнул, издаем звук
-      if (d == 0) { tone(10, 200); delay(100); noTone(10); }
-      else { delay(100); }
+      if (d == 0) {
+        tone(10, 200);
+        delay(100);
+        noTone(10);
+      } else {
+        delay(100);
+      }
 
       // если дракончик не столкнулся, то меняем положение препятствия
       // начинаем считать сколько циклов дракончик находится в прыжке
@@ -692,6 +685,5 @@ void Game () {
     level = level + 1;
     pause = pause - 50;
     if (pause < 0) pause = 0;
-
   }
 }
