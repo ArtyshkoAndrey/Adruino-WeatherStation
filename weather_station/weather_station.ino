@@ -71,6 +71,7 @@ int level = 1;    // переменная для отсчета уровня
 int pause = 400;  // переменная для задержки
 byte p = 0;       // переменная для времени прыжка
 
+unsigned int resetCount = 0; // счётчик для сброса настроек в памяти
 // создаем массивы дракончика, дерева, камня и птицы
 byte dracon[8] = {
   0b01110, 0b11011, 0b11111, 0b11100, 0b11111, 0b01100, 0b10010, 0b11011
@@ -255,6 +256,20 @@ void funRightButton() {
 
 
       cursor(xPos, 0);
+    }
+  } else {
+    resetCount++;
+
+    if (resetCount = 1) {
+        // clearRecords
+      saveRecords(0, 0);
+
+      getRecords();
+
+      resetCount = 0;
+      lcd.clear();
+      lcd.print("CLEAR TEMP");
+      delay(1000);
     }
   }
 }
