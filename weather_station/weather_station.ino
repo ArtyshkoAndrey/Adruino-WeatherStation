@@ -12,6 +12,8 @@
 // Тот самый номер пина датчика
 #define DHTPIN 10
 
+#define MAX_SETTINGS_VIEW 1
+
 #define VERSION "1.4"
 
 LiquidCrystal lcd(5, 4, 9, 8, 7, 6);
@@ -72,6 +74,10 @@ int pause = 400;  // переменная для задержки
 byte p = 0;       // переменная для времени прыжка
 
 unsigned int resetCount = 0; // счётчик для сброса настроек в памяти
+
+bool settingsShow = false;
+unsigned int settingsView = 0;
+
 // создаем массивы дракончика, дерева, камня и птицы
 byte dracon[8] = {
   0b01110, 0b11011, 0b11111, 0b11100, 0b11111, 0b01100, 0b10010, 0b11011
@@ -130,7 +136,7 @@ void setup() {
 
   getRecords();
 
-  delay(1000);
+  delay(4000);
 }
 
 void getRecords() {
@@ -162,7 +168,7 @@ void ListenBooton() {
         break;
       case 151 ... 360:
         Serial.println("DOWN");
-        if (rewriteTimeMode == false && gamer == false) {
+        if (rewriteTimeMode == false && gamer == false && settingsShow == false) {
           counterGamer++;
 
           if (counterGamer > 10) {
@@ -180,7 +186,7 @@ void ListenBooton() {
         break;
       case 536 ... 760:
         Serial.println("SELECT");
-        if (rewriteTimeMode == false && gamer == true) {
+        if (rewriteTimeMode == false && gamer == true && settingsShow == false) {
           counterGamer++;
 
           if (counterGamer > 10) {
@@ -211,37 +217,21 @@ void ListenBooton() {
 
 // Нажатие на кнопку Селект
 void funSelectButton() {
-  rewriteTimeMode = !rewriteTimeMode;
+  settingsShow = !settingsShow;
 
-  Serial.print("Change rewriteTimeMode: ");
-  Serial.println(rewriteTimeMode);
+  Serial.print("Open Settings: ");
+  Serial.println(settingsShow);
 
-  // Если включили режим изменения времени, то выводит один раз время
-  // Останавливаем вывод в лупе
-  // Запускаем мигающий курсор
-
-  // Если выключили то убирает мигание и запускаем вывод всей информации
   if (rewriteTimeMode == true) {
-    buttonClickInterval = INTERVAL_IN_TIME_MODE;
-    xPos = 0;
-    cursor(0, 0);
-    Serial.println(hour + ":" + min + ":" + sec);
-    lcd.print(hour + ":" + min + ":" + sec);
-    cursor(0, 1);
-    lcd.print("                ");
-    cursor(xPos, 0);
-    lcd.blink();
-
-    // Задержка системы что бы дважди не кликнуть за одно нажатие
-    delay(500);
-  } else if (rewriteTimeMode == false) {
-    if (editableTime) {
-      rtc.setTime(hour.toInt(), min.toInt(), sec.toInt());
-    }
-    buttonClickInterval = INTERVAL_ISNT_TIME_MODE;
-    lcd.noBlink();
-    xPos = 0;
-    cursor(xPos, 0);
+    rewriteTimeMode = false;
+    gamer = false;
+    settingsShow = false;
+    viewUpdateTime();
+  } else if (settingsShow) {
+    lcd.clear();
+    lcd.print("    SETTINGS    ");
+    delay(700);
+    settingsScreen();
   }
 }
 
@@ -257,20 +247,6 @@ void funRightButton() {
 
       cursor(xPos, 0);
     }
-  } else {
-    resetCount++;
-
-    if (resetCount = 1) {
-        // clearRecords
-      saveRecords(0, 0);
-
-      getRecords();
-
-      resetCount = 0;
-      lcd.clear();
-      lcd.print("CLEAR TEMP");
-      delay(1000);
-    }
   }
 }
 
@@ -285,6 +261,24 @@ void funLeftButton() {
 
 
       cursor(xPos, 0);
+    }
+  }
+
+  if (settingsShow) {
+    if (settingsView == 0) {
+      saveRecords(0, 0);
+
+      getRecords();
+      lcd.clear();
+      lcd.print("CLEAR TEMP");
+      settingsView = 0;
+      settingsShow = false;
+      delay(1000);
+    } else if (settingsView == 1) {
+      rewriteTimeMode = true;
+      settingsShow = false;
+      settingsView = 0;
+      viewUpdateTime();
     }
   }
 }
@@ -392,6 +386,16 @@ void funUpButton() {
       sec.setCharAt(1, sChar);
     }
   }
+
+  if (settingsShow) {
+    if (settingsView == 0) {
+      settingsView = MAX_SETTINGS_VIEW;
+    } else {
+      settingsView--;
+    }
+
+    settingsScreen();
+  }
 }
 
 // Нажатие на кнопку Вниз
@@ -447,7 +451,7 @@ void funDownButton() {
       char sChar = sec.charAt(0);
       int s = sChar - '0';
 
-      if (s > 5) {
+      if (s > 0) {
         s--;
         sChar = s + '0';
         sec.setCharAt(0, sChar);
@@ -465,6 +469,16 @@ void funDownButton() {
       }
     }
   }
+
+  if (settingsShow) {
+    if (settingsView == MAX_SETTINGS_VIEW) {
+      settingsView = 0;
+    } else {
+      settingsView++;
+    }
+
+    settingsScreen();
+  }
 }
 
 // Сдвиг курсота на осям
@@ -477,9 +491,9 @@ void updateViewer() {
   unsigned long currentMillis = millis();
   if (currentMillis - viewerMillis > viewerInterval) {
 
-    viewerMillis = currentMillis;
-    if (!rewriteTimeMode && !gamer) {
-
+    
+    if (!rewriteTimeMode && !gamer && !settingsShow) {
+      viewerMillis = currentMillis;
       if (screen == 1) {
         cursor(0, 0);
         updateLocaleTime();
@@ -533,6 +547,7 @@ void updateLocaleTime() {
 
 // Обновление температуры и давления
 void updateBMP180() {
+  
   unsigned long currentMillis = millis();
   if (currentMillis - updateBMP180Millis > updateBMP180Interval) {
     if (screen == 1) {
@@ -567,8 +582,45 @@ void updateBMP180() {
   }
 }
 
-void loop() {
+void settingsScreen () {
+  lcd.clear();
+  if (settingsView == 0) {
+    lcd.print("Clear Temp Data?");
+    cursor(0, 1);
+    lcd.print("L-YES S-EXIT");
+  } else if (settingsView == 1) {
+    lcd.print("Edit Time?");
+    cursor(0, 1);
+     lcd.print("L-YES S-EXIT");
+  }
+}
 
+void viewUpdateTime () {
+  if (rewriteTimeMode == true) {
+    buttonClickInterval = INTERVAL_IN_TIME_MODE;
+    xPos = 0;
+    cursor(0, 0);
+    Serial.println(hour + ":" + min + ":" + sec + "        ");
+    lcd.print(hour + ":" + min + ":" + sec + "        ");
+    cursor(0, 1);
+    lcd.print("                ");
+    cursor(xPos, 0);
+    lcd.blink();
+
+    // Задержка системы что бы дважди не кликнуть за одно нажатие
+    delay(500);
+  } else if (rewriteTimeMode == false) {
+    if (editableTime) {
+      rtc.setTime(hour.toInt(), min.toInt(), sec.toInt());
+    }
+    buttonClickInterval = INTERVAL_ISNT_TIME_MODE;
+    lcd.noBlink();
+    xPos = 0;
+    cursor(xPos, 0);
+  }
+}
+
+void loop() {
   ListenBooton();
   updateBMP180();
 
