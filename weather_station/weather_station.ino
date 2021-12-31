@@ -24,6 +24,7 @@ DHT dht(DHTPIN, DHT11);
 long long viewerMillis = 0;
 long long getButtonClickMillis = 0;
 long long updateBMP180Millis = -5000;
+long long updateDHTMillis = -20000;
 
 // Переменная в которой лежит обьект времени с часов
 Time t;
@@ -39,6 +40,7 @@ long long viewerInterval = 1000;
 long long buttonClickInterval = INTERVAL_IN_TIME_MODE;
 
 long long updateBMP180Interval = 5000;
+long long updateDHTInterval = 15000;
 
 // Для режима что бы менять время
 bool rewriteTimeMode = false;
@@ -54,6 +56,7 @@ unsigned int xPos = 0;
 
 unsigned int mmg = 0;
 unsigned int temp = 0;
+unsigned int tempBMP = 0;
 unsigned int hum = 0;
 
 unsigned int recordsTemp[2];
@@ -136,7 +139,7 @@ void setup() {
 
   getRecords();
 
-  delay(4000);
+  delay(2000);
 }
 
 void getRecords() {
@@ -497,7 +500,7 @@ void updateViewer() {
       if (screen == 1) {
         cursor(0, 0);
         updateLocaleTime();
-        lcd.print(hour + ":" + min + ":" + sec + "        ");
+        lcd.print(hour + ":" + min + "   BMP=" + tempBMP + "*C");
         cursor(0, 1);
         lcd.print(temp);
         lcd.print("*C ");
@@ -558,27 +561,34 @@ void updateBMP180() {
 
     updateBMP180Millis = currentMillis;
     bool flagUpdateEeprom = false;
-    temp = bmp.readTemperature();
+    tempBMP = bmp.readTemperature();
 
     float pa = bmp.readPressure();
     pa = pa * 0.007500637554192;
     mmg = pa;
 
-    hum = dht.readHumidity();
-
-    if (temp < recordsTemp[0] || recordsTemp[0] == 0) {
+    if (tempBMP < recordsTemp[0] || recordsTemp[0] == 0) {
       flagUpdateEeprom = true;
-      recordsTemp[0] = temp;
+      recordsTemp[0] = tempBMP;
     }
 
     if (temp > recordsTemp[1]) {
       flagUpdateEeprom = true;
-      recordsTemp[1] = temp;
+      recordsTemp[1] = tempBMP;
     }
 
     if (flagUpdateEeprom) {
       saveRecords(recordsTemp[0], recordsTemp[1]);
     }
+  }
+}
+void updateDHT() {
+  unsigned long currentMillis = millis();
+  if (currentMillis - updateDHTMillis > updateDHTInterval) {
+  
+    updateDHTMillis = currentMillis;
+    temp = dht.readTemperature();
+    hum = dht.readHumidity();
   }
 }
 
@@ -621,12 +631,13 @@ void viewUpdateTime () {
 }
 
 void loop() {
+  updateDHT();
   ListenBooton();
   updateBMP180();
 
   updateViewer();
 
-//  Game();
+  Game();
 }
 
 void Game() {
